@@ -1,0 +1,425 @@
+<html><head><base href="https://vousetes.au/restaurant/">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système de Communication pour Restaurant</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f0f0f0;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      }
+      h1, h2, h3 {
+        color: #333;
+      }
+      button {
+        background-color: #4CAF50;
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+      .table {
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+      }
+      .table-waiting {
+        background-color: #ffe6e6;
+      }
+      .table-served {
+        background-color: #e6ffe6;
+      }
+      #messageHistory {
+        margin-top: 20px;
+        border-top: 1px solid #ccc;
+        padding-top: 20px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .message {
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .client {
+        background-color: #e6f3ff;
+      }
+      .server {
+        background-color: #e6ffe6;
+      }
+      .tab-button {
+        background-color: #f1f1f1;
+        border: none;
+        color: black;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 4px 4px 0 0;
+      }
+      .tab-button.active {
+        background-color: #ccc;
+      }
+      .tab-content {
+        display: none;
+        padding: 20px;
+        border: 1px solid #ccc;
+        border-top: none;
+      }
+      #qrCode {
+        text-align: center;
+        margin-top: 20px;
+      }
+      .client-tables {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-around;
+      }
+      .client-table {
+        width: 18%;
+        margin: 10px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        text-align: center;
+      }
+      .server-interface {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+      .server-section {
+        width: 48%;
+        margin-bottom: 20px;
+      }
+      .server-tables {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+      .server-table {
+        width: 48%;
+        margin-bottom: 10px;
+      }
+      .client-options {
+        display: none;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Système de Communication pour Restaurant</h1>
+        <div class="tabs">
+          <button class="tab-button active" onclick="openTab(event, 'clientInterface')">Interface Client</button>
+          <button class="tab-button" onclick="openTab(event, 'serverInterface')">Interface Serveur</button>
+          <button class="tab-button" onclick="openTab(event, 'managerInterface')">Interface Gérant</button>
+        </div>
+    
+        <div id="clientInterface" class="tab-content" style="display:block;">
+          <h2>Interface Client</h2>
+          <div class="client-tables">
+            <!-- Les 10 tables seront générées dynamiquement ici -->
+          </div>
+          <div id="messageHistory"></div>
+        </div>
+    
+        <div id="serverInterface" class="tab-content">
+          <h2>Interface Serveur</h2>
+          <div class="server-interface">
+            <div class="server-section">
+              <h3>Serveur A</h3>
+              <div class="server-tables" id="serverATables"></div>
+            </div>
+            <div class="server-section">
+              <h3>Serveur B</h3>
+              <div class="server-tables" id="serverBTables"></div>
+            </div>
+            <div class="server-section">
+              <h3>Serveur C</h3>
+              <div class="server-tables" id="serverCTables"></div>
+            </div>
+            <div class="server-section">
+              <h3>Serveur D</h3>
+              <div class="server-tables" id="serverDTables"></div>
+            </div>
+          </div>
+        </div>
+    
+        <div id="managerInterface" class="tab-content">
+          <h2>Interface Gérant</h2>
+          <div>
+            <h3>Statistiques des Appels</h3>
+            <canvas id="callsChart"></canvas>
+          </div>
+          <div>
+            <h3>Temps de Réponse Moyen</h3>
+            <p id="avgResponseTime"></p>
+          </div>
+          <div>
+            <h3>Tables en Attente</h3>
+            <ul id="waitingTables"></ul>
+          </div>
+          <div>
+            <h3>Assignation des Serveurs</h3>
+            <ul id="serverAssignments"></ul>
+          </div>
+        </div>
+      </div>
+    
+      <script>
+        let tables = [];
+        let calls = {
+          responded: 0,
+          missed: 0
+        };
+        let responseTimes = [];
+        let servers = ['A', 'B', 'C', 'D'];
+        let serverAssignments = {};
+    
+        function initializeTables() {
+          for (let i = 1; i <= 10; i++) {
+            tables.push({
+              number: i,
+              status: 'idle',
+              lastCall: null,
+              assignedServer: null
+            });
+          }
+          updateServerInterface();
+          updateClientInterface();
+        }
+    
+        function updateServerInterface() {
+          servers.forEach(server => {
+            let serverTablesContainer = document.getElementById(`server${server}Tables`);
+            serverTablesContainer.innerHTML = '';
+            tables.filter(table => table.assignedServer === server).forEach(table => {
+              let tableElement = document.createElement('div');
+              tableElement.classList.add('server-table', 'table');
+              if (table.status === 'waiting') {
+                tableElement.classList.add('table-waiting');
+              } else if (table.status === 'served') {
+                tableElement.classList.add('table-served');
+              }
+              tableElement.innerHTML = `
+                <h4>Table ${table.number}</h4>
+                <p>Statut: ${table.status}</p>
+                ${table.status === 'waiting' ? `
+                  <button onclick="serveTable(${table.number}, '${server}', '1min')">Servir dans 1min</button>
+                  <button onclick="serveTable(${table.number}, '${server}', '5min')">Servir dans 5min</button>
+                  <button onclick="reassignTable(${table.number})">Réassigner</button>
+                ` : ''}
+              `;
+              serverTablesContainer.appendChild(tableElement);
+            });
+          });
+        }
+    
+        function updateClientInterface() {
+          let clientTablesContainer = document.querySelector('.client-tables');
+          clientTablesContainer.innerHTML = '';
+          tables.forEach(table => {
+            let tableElement = document.createElement('div');
+            tableElement.classList.add('client-table');
+            tableElement.id = `clientTable${table.number}`;
+            tableElement.innerHTML = `
+              <h3>Table ${table.number}</h3>
+              <div id="qrCode${table.number}"></div>
+              <div class="client-options" id="clientOptions${table.number}">
+                <button onclick="callWaiter(${table.number}, 'order')">Je veux passer des commandes</button>
+                <button onclick="callWaiter(${table.number}, 'bill')">Je veux régler l'addition</button>
+              </div>
+              <p id="serverAssigned${table.number}"></p>
+            `;
+            clientTablesContainer.appendChild(tableElement);
+            generateQRCode(table.number);
+            updateClientTable(table.number);
+          });
+        }
+    
+        function updateClientTable(tableNumber) {
+          let table = tables.find(t => t.number === tableNumber);
+          let clientTable = document.getElementById(`clientTable${tableNumber}`);
+          if (clientTable) {
+            let serverAssignedElement = document.getElementById(`serverAssigned${tableNumber}`);
+            serverAssignedElement.textContent = table.assignedServer ? `Serveur assigné: ${table.assignedServer}` : '';
+          }
+        }
+    
+        function generateQRCode(tableNumber) {
+          let qr = qrcode(0, 'M');
+          qr.addData(`https://vousetes.au/restaurant/table/${tableNumber}`);
+          qr.make();
+          let qrCodeElement = document.getElementById(`qrCode${tableNumber}`);
+          if (qrCodeElement) {
+            qrCodeElement.innerHTML = qr.createImgTag(5);
+            qrCodeElement.onclick = () => showClientOptions(tableNumber);
+          }
+        }
+    
+        function showClientOptions(tableNumber) {
+          let clientOptions = document.getElementById(`clientOptions${tableNumber}`);
+          if (clientOptions) {
+            clientOptions.style.display = 'block';
+          }
+        }
+    
+        function callWaiter(tableNumber, reason) {
+          let table = tables.find(t => t.number === tableNumber);
+          if (table) {
+            table.status = 'waiting';
+            table.lastCall = new Date();
+            if (!table.assignedServer) {
+              assignServerToTable(table);
+            }
+            let message = reason === 'order' ? 'Je veux passer des commandes' : 'Je veux régler l\'addition';
+            addMessage('client', `Table ${tableNumber}: ${message}`);
+            updateServerInterface();
+            updateManagerInterface();
+            updateClientTable(tableNumber);
+          }
+        }
+    
+        function assignServerToTable(table) {
+          let availableServers = servers.filter(server => 
+            tables.filter(t => t.assignedServer === server).length < 3
+          );
+          if (availableServers.length > 0) {
+            let randomServer = availableServers[Math.floor(Math.random() * availableServers.length)];
+            table.assignedServer = randomServer;
+            serverAssignments[table.number] = randomServer;
+          } else {
+            console.log("Tous les serveurs sont occupés!");
+          }
+        }
+    
+        function serveTable(tableNumber, server, time) {
+          let table = tables.find(t => t.number === tableNumber);
+          if (table) {
+            table.status = 'served';
+            calls.responded++;
+            let responseTime = (new Date() - table.lastCall) / 1000; // en secondes
+            responseTimes.push(responseTime);
+            addMessage('server', `Serveur ${server} - Table ${tableNumber}: Bien reçu, j'arrive dans ${time}`);
+            updateServerInterface();
+            updateManagerInterface();
+            updateClientTable(tableNumber);
+          }
+        }
+    
+        function reassignTable(tableNumber) {
+          let table = tables.find(t => t.number === tableNumber);
+          if (table) {
+            table.assignedServer = null;
+            assignServerToTable(table);
+            updateServerInterface();
+            updateManagerInterface();
+            updateClientTable(tableNumber);
+          }
+        }
+    
+        function addMessage(sender, message) {
+          let messageHistory = document.getElementById('messageHistory');
+          let messageElement = document.createElement('div');
+          messageElement.classList.add('message', sender);
+          messageElement.textContent = message;
+          messageHistory.appendChild(messageElement);
+          messageHistory.scrollTop = messageHistory.scrollHeight;
+        }
+    
+        function updateManagerInterface() {
+          updateCallsChart();
+          updateAverageResponseTime();
+          updateWaitingTables();
+          updateServerAssignments();
+        }
+    
+        function updateCallsChart() {
+          let ctx = document.getElementById('callsChart').getContext('2d');
+          new Chart(ctx, {
+            type: 'pie',
+            data: {
+              labels: ['Répondus', 'Manqués'],
+              datasets: [{
+                data: [calls.responded, calls.missed],
+                backgroundColor: ['#4CAF50', '#f44336']
+              }]
+            }
+          });
+        }
+    
+        function updateAverageResponseTime() {
+          let avgTime = responseTimes.length > 0 ? responseTimes.reduce((a, b) => a + b) / responseTimes.length : 0;
+          document.getElementById('avgResponseTime').textContent = `Temps de réponse moyen: ${avgTime.toFixed(2)} secondes`;
+        }
+    
+        function updateWaitingTables() {
+          let waitingTablesList = document.getElementById('waitingTables');
+          waitingTablesList.innerHTML = '';
+          tables.filter(t => t.status === 'waiting').forEach(table => {
+            let li = document.createElement('li');
+            li.textContent = `Table ${table.number} (Serveur ${table.assignedServer})`;
+            waitingTablesList.appendChild(li);
+          });
+        }
+    
+        function updateServerAssignments() {
+          let serverAssignmentsList = document.getElementById('serverAssignments');
+          serverAssignmentsList.innerHTML = '';
+          Object.entries(serverAssignments).forEach(([tableNumber, server]) => {
+            let li = document.createElement('li');
+            li.textContent = `Table ${tableNumber}: Serveur ${server}`;
+            serverAssignmentsList.appendChild(li);
+          });
+        }
+    
+        function openTab(evt, tabName) {
+          let tabContents = document.getElementsByClassName("tab-content");
+          for (let i = 0; i < tabContents.length; i++) {
+            tabContents[i].style.display = "none";
+          }
+    
+          let tabButtons = document.getElementsByClassName("tab-button");
+          for (let i = 0; i < tabButtons.length; i++) {
+            tabButtons[i].className = tabButtons[i].className.replace(" active", "");
+          }
+    
+          document.getElementById(tabName).style.display = "block";
+          evt.currentTarget.className += " active";
+        }
+    
+        // Initialisation
+        initializeTables();
+        updateManagerInterface();
+    
+        // Simulation d'appels clients toutes les 30 secondes
+        setInterval(() => {
+          let availableTables = tables.filter(t => t.status === 'idle');
+          if (availableTables.length > 0) {
+            let randomTable = availableTables[Math.floor(Math.random() * availableTables.length)];
+            callWaiter(randomTable.number, Math.random() > 0.5 ? 'order' : 'bill');
+          }
+        }, 30000);
+      </script>
+    </body></html>
